@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-init
+  namespace: cloudops
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: postgres-init
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              psql -h postgres -p 5432 \
+                -U "$POSTGRES_USER" \
+                -d "$POSTGRES_DB" \
+                -v ON_ERROR_STOP=1 \
+                -f /sql/init.sql
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: cloudopsdb
+          volumeMounts:
+            - name: init-sql
+              mountPath: /sql
+              readOnly: true
+      volumes:
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
